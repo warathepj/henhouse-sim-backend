@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import mqtt from 'mqtt';
 import dotenv from 'dotenv';
+import logger from './logger.js';
 
 // Load environment variables
 dotenv.config();
@@ -26,11 +27,20 @@ const client = mqtt.connect(process.env.BROKER_URL, {
 });
 
 client.on('connect', () => {
-  console.log('Connected to MQTT broker');
+  logger.info('========== MQTT Connection ==========');
+  logger.info('Successfully connected to MQTT broker');
 });
 
 client.on('error', (err) => {
-  console.error('MQTT connection error:', err);
+  logger.error('========== MQTT Error ==========', err);
+});
+
+client.on('close', () => {
+  logger.info('========== MQTT Connection Closed ==========');
+});
+
+client.on('offline', () => {
+  logger.info('========== MQTT Client Offline ==========');
 });
 
 // Mock API endpoint for demonstration
@@ -64,40 +74,48 @@ let temperatureDataStorage = null;
  * @param {Object} data - Temperature data object from sensors
  */
 const publishTemperatureData = (data) => {
+  logger.info('========== Temperature Data Received ==========');
+  logger.debug('Raw data: ' + JSON.stringify(data, null, 2));
+  
+  if (!data) {
+    logger.error('No data received');
+    return null;
+  }
+
   // Format timestamp for better readability
   const timestamp = new Date(data.timestamp).toLocaleString();
   
   // Create a detailed log header
-  console.log('\n========== Temperature Data Received from Coop Vision Architect ==========');
-  console.log(`Timestamp: ${timestamp}`);
-  console.log('\nDetailed Sensor Readings:');
+  logger.info('========== Temperature Data Received from Coop Vision Architect ==========');
+  logger.info(`Timestamp: ${timestamp}`);
+  logger.info('Detailed Sensor Readings:');
   
   // Log Coop A details
-  console.log('\nCoop A:');
-  console.log(`  Corner Temperature: ${data.coopA.corner}°C`);
-  console.log(`  Center Temperature: ${data.coopA.center}°C`);
+  logger.info('\nCoop A:');
+  logger.info(`  Corner Temperature: ${data.coopA.corner}°C`);
+  logger.info(`  Center Temperature: ${data.coopA.center}°C`);
   
   // Log Coop B details
-  console.log('\nCoop B:');
-  console.log(`  Corner Temperature: ${data.coopB.corner}°C`);
-  console.log(`  Center Temperature: ${data.coopB.center}°C`);
+  logger.info('\nCoop B:');
+  logger.info(`  Corner Temperature: ${data.coopB.corner}°C`);
+  logger.info(`  Center Temperature: ${data.coopB.center}°C`);
   
   // Log Coop C details
-  console.log('\nCoop C:');
-  console.log(`  Center Temperature: ${data.coopC.center}°C`);
+  logger.info('\nCoop C:');
+  logger.info(`  Center Temperature: ${data.coopC.center}°C`);
   
   // Log Ventilation details
-  console.log('\nVentilation System:');
-  console.log(`  Main: ${data.ventilation.main}°C`);
-  console.log(`  Secondary: ${data.ventilation.secondary}°C`);
-  console.log(`  East: ${data.ventilation.east}°C`);
+  logger.info('\nVentilation System:');
+  logger.info(`  Main: ${data.ventilation.main}°C`);
+  logger.info(`  Secondary: ${data.ventilation.secondary}°C`);
+  logger.info(`  East: ${data.ventilation.east}°C`);
   
   // Log Processing details
-  console.log('\nProcessing Area:');
-  console.log(`  Egg Washing: ${data.processing.eggWashing}°C`);
-  console.log(`  Egg Storage: ${data.processing.eggStorage}°C`);
+  logger.info('\nProcessing Area:');
+  logger.info(`  Egg Washing: ${data.processing.eggWashing}°C`);
+  logger.info(`  Egg Storage: ${data.processing.eggStorage}°C`);
   
-  console.log('\nPublishing data to MQTT topics...');
+  logger.info('\nPublishing data to MQTT topics...');
   
   // Store data in memory for persistence
   temperatureDataStorage = data;
@@ -150,12 +168,10 @@ const publishTemperatureData = (data) => {
 
   Promise.all(publishPromises)
     .then(() => {
-      console.log('✓ Successfully published all temperature data to MQTT broker');
-      console.log('================================================================\n');
+      logger.info('✓ Successfully published all temperature data to MQTT broker');
     })
     .catch((error) => {
-      console.error('✗ Error publishing to MQTT:', error);
-      console.log('================================================================\n');
+      logger.error('✗ Error publishing to MQTT:', error);
     });
   
   return data;
@@ -233,16 +249,18 @@ console.log('MQTT client created with broker URL:', process.env.BROKER_URL);
 
 // Modify the startServer function
 const startServer = () => {
-  console.log('Starting server...');
-  console.log('Environment variables loaded:', {
-    brokerUrl: process.env.BROKER_URL,
-    userConfigured: !!process.env.USER,
-    passwordConfigured: !!process.env.PASSWORD
+  // Force immediate console output
+  console.log('\n========== Starting Server ==========');
+  console.log('Environment variables:', {
+    BROKER_URL: process.env.BROKER_URL || 'not set',
+    USER: process.env.USER ? 'set' : 'not set',
+    PASSWORD: process.env.PASSWORD ? 'set' : 'not set'
   });
-  
+
   app.listen(PORT, () => {
-    console.log(`Simulator backend running on http://localhost:${PORT}`);
-    console.log(`Temperature data endpoint: POST http://localhost:${PORT}/api/temperature-data`);
+    console.log(`\nServer is running on http://localhost:${PORT}`);
+    console.log(`API endpoint: http://localhost:${PORT}/api/temperature-data`);
+    console.log('\nWaiting for incoming requests...\n');
   });
 };
 
